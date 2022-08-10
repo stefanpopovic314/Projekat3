@@ -1,0 +1,322 @@
+SELECT * 
+from nashville_housing;
+
+--Da provjerimo broj redova
+SELECT
+    COUNT(*)
+FROM
+    nashville_housing; 
+    
+SELECT SALEDATE, TO_DATE (SALEDATE,'MM/DD/YYYY')--TO_DATE(SALEDATE, 'DD.MM.YYYY') FROM nashville_housing;
+from nashville_housing;
+
+UPDATE nashville_housing
+SET saledate = TO_DATE (SALEDATE,'MM/DD/YYYY');
+
+SELECT *
+FROM nashville_housing;
+
+SELECT PROPERTYADDRESS
+FROM nashville_housing
+WHERE propertyaddress IS NULL;
+
+--POPULATE PROPERTY ADDRESS DATE
+SELECT *
+FROM nashville_housing
+WHERE propertyaddress IS NULL;
+
+SELECT *
+FROM nashville_housing
+ORDER BY PARCELID;
+
+SELECT  A.PARCELID, a.propertyaddress, B.PARCELID, b.propertyaddress
+FROM nashville_housing A
+JOIN nashville_housing B
+ON A.PARCELID=b.parcelid
+AND A.uniqueid <> B.uniqueid
+WHERE A.PROPERTYADDRESS IS NULL;
+/*
+update NASHVILLE_HOUSING
+set PROPERTYADDRESS = (select coalesce(A.PROPERTYADDRESS,B.PROPERTYADDRESS)
+FROM NASHVILLE_HOUSING A JOIN NASHVILLE_HOUSING B
+ON (A.PARCELID = B.PARCELID AND A.UNIQUEID <> B.UNIQUEID )
+WHERE A.PROPERTYADDRESS IS NULL);
+*/
+
+UPDATE NASHVILLE_HOUSING a
+SET a.propertyaddress = (
+SELECT MAX(b.propertyaddress)
+FROM NASHVILLE_HOUSING b
+WHERE a.parcelid = b.parcelid
+AND a.uniqueid <> b.uniqueid)
+WHERE a.propertyaddress IS NULL;
+
+select *
+from NASHVILLE_HOUSING
+where propertyaddress is null;
+
+
+select propertyaddress
+from nashville_housing;
+
+SELECT
+    substr(propertyaddress, 1, instr(propertyaddress, ',') - 1)
+FROM
+    nashville_housing;
+
+SELECT
+    substr(propertyaddress, instr(propertyaddress, ',') + 1, length(propertyaddress))
+FROM
+    nashville_housing;
+    
+--Sad cemo od ovoga napraviti dvije nove kolone
+--..koje prethodno moramo kreirati
+
+ALTER TABLE nashville_housing ADD propertysplitaddress VARCHAR2(200);
+
+ALTER TABLE nashville_housing ADD propertysplitcity VARCHAR2(200);
+
+select *
+from  nashville_housing;
+
+--Sad cemo napuniti ove nove kolone ovim gore vrijednostima
+UPDATE nashville_housing
+SET
+    propertysplitaddress = substr(propertyaddress, 1, instr(propertyaddress, ',') - 1);
+--56,477 rows updated.
+
+UPDATE nashville_housing
+SET
+    propertysplitcity = substr(propertyaddress, instr(propertyaddress, ',') + 1, length(propertyaddress));
+--56,477 rows updated.
+
+
+select *
+from nashville_housing;
+
+
+select owneraddress
+from nashville_housing;
+
+SELECT
+    owneraddress,
+    regexp_substr(owneraddress, '[^,]+', 1, 1)           AS ownersplitaddress,
+    regexp_substr(owneraddress, '[^,]+', 1, 2)           AS ownersplitcity,
+    regexp_substr(owneraddress, '[^,]+', 1, 3)           AS ownersplitstate
+FROM
+    nashville_housing;
+    
+--Sad cemo opet alterovati tabelu, kreirati nove tri kolone i updateati ih ovim podacima
+ALTER TABLE nashville_housing ADD ownersplitaddress VARCHAR2(200);
+
+ALTER TABLE nashville_housing ADD ownersplitcity VARCHAR2(200);
+
+ALTER TABLE nashville_housing ADD ownersplitstate VARCHAR2(50);
+
+
+UPDATE nashville_housing
+SET
+    ownersplitaddress = regexp_substr(owneraddress, '[^,]+', 1, 1);
+--56,477 rows updated.
+
+UPDATE nashville_housing
+SET
+    ownersplitcity = regexp_substr(owneraddress, '[^,]+', 1, 2);
+--56,477 rows updated.
+
+UPDATE nashville_housing
+SET
+    ownersplitstate = regexp_substr(owneraddress, '[^,]+', 1, 3);
+--56,477 rows updated.
+
+
+select*
+from nashville_housing;
+
+
+--Change Y and N to Yes i No in 'Sold as Vacant' fields
+-------------------------------------------------------
+
+--Da prebrojimo koliko kojih ima
+SELECT
+    soldasvacant,
+    COUNT(*)
+FROM
+    nashville_housing
+GROUP BY
+    soldasvacant
+ORDER BY
+    2 DESC;
+    
+--Hocemo da promijenimo sve N u No i sve Y u Yes
+SELECT
+    soldasvacant,
+    (
+        CASE
+            WHEN soldasvacant = 'Y'  THEN
+                'Yes'
+            WHEN soldasvacant = 'N'  THEN
+                'No'
+            ELSE
+                soldasvacant
+        END
+    ) AS soldchng
+FROM
+    nashville_housing;
+
+
+--Da probamo da li ce proci update kao kod Alexa
+UPDATE nashville_housing
+SET
+    soldasvacant =
+        CASE
+            WHEN soldasvacant = 'Y'  THEN
+                'Yes'
+            WHEN soldasvacant = 'N'  THEN
+                'No'
+            ELSE
+                soldasvacant
+        END;
+--56,477 rows updated.
+
+SELECT DISTINCT
+    soldasvacant
+FROM
+    nashville_housing;
+    
+--Remove Duplicates
+-------------------
+
+SELECT
+    n.*,
+    ROW_NUMBER()
+    OVER(PARTITION BY n.parcelid, n.propertyaddress, n.saleprice, n.saledate, n.legalreference
+         ORDER BY n.uniqueid
+    ) row_num
+FROM
+    nashville_housing n
+ORDER BY
+    n.parcelid;
+    
+--Napravimo ovo kao CTE (Common Table Expressions)
+WITH rownumcte AS (
+    SELECT
+        n.*,
+        ROW_NUMBER()
+        OVER(PARTITION BY n.parcelid, n.propertyaddress, n.saleprice, n.saledate, n.legalreference
+             ORDER BY n.uniqueid
+        ) row_num
+    FROM
+        nashville_housing n
+)
+SELECT
+    *
+FROM
+    rownumcte;
+    
+
+WITH rownumcte AS (
+    SELECT
+        n.*,
+        ROW_NUMBER()
+        OVER(PARTITION BY n.parcelid, n.propertyaddress, n.saleprice, n.saledate, n.legalreference
+             ORDER BY n.uniqueid
+        ) row_num
+    FROM
+        nashville_housing n
+)
+SELECT
+    *
+FROM
+    rownumcte
+WHERE
+    row_num > 1
+ORDER BY
+    propertyaddress;
+--svi ovi su duplikati, ima ih 104
+
+--Sad ih treba izbrisati
+WITH rownumcte AS (
+    SELECT
+        n.*,
+        ROW_NUMBER()
+        OVER(PARTITION BY n.parcelid, n.propertyaddress, n.saleprice, n.saledate, n.legalreference
+             ORDER BY n.uniqueid
+        ) row_num
+    FROM
+        nashville_housing n
+)
+SELECT
+    *
+FROM
+    rownumcte
+WHERE
+    row_num > 1
+ORDER BY
+    propertyaddress;
+--svi ovi su duplikati, ima ih 104
+
+--Sad ih treba izbrisati
+
+
+DELETE FROM nashville_housing
+WHERE
+    uniqueid IN (
+        WITH rownumcte AS (
+            SELECT
+                n.*, ROW_NUMBER()
+                     OVER(PARTITION BY n.parcelid, n.propertyaddress, n.saleprice, n.saledate, n.legalreference
+                          ORDER BY n.uniqueid
+                     ) row_num
+            FROM
+                nashville_housing n
+        )
+        SELECT
+            uniqueid
+        FROM
+            rownumcte
+        WHERE
+            row_num > 1
+    );
+    
+    
+    --Provjera da li sad ima duplih
+WITH rownumcte AS (
+    SELECT
+        n.*,
+        ROW_NUMBER()
+        OVER(PARTITION BY n.parcelid, n.propertyaddress, n.saleprice, n.saledate, n.legalreference
+             ORDER BY n.uniqueid
+        ) row_num
+    FROM
+        nashville_housing n
+)
+SELECT
+    *
+FROM
+    rownumcte
+WHERE
+    row_num > 1
+ORDER BY
+    propertyaddress;
+    
+--nema
+
+--Rijesicemo se kolona koje nam ne trebaju
+ALTER TABLE nashville_housing DROP COLUMN owneraddress;
+--Table NHC altered.
+
+ALTER TABLE nashville_housing DROP COLUMN taxdistrict;
+--Table NHC altered.
+
+ALTER TABLE nashville_housing DROP COLUMN propertyaddress;
+--Table NHC altered.
+
+ALTER TABLE nashville_housing DROP COLUMN saledate;
+--Table NHC altered.
+
+--Provjera
+SELECT
+    *
+FROM
+    nashville_housing;
